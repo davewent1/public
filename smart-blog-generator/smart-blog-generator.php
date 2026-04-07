@@ -115,6 +115,25 @@ register_activation_hook( SBG_PLUGIN_FILE, 'sbg_activate' );
  * Uses add_option() so existing values are never overwritten on reactivation.
  */
 function sbg_activate(): void {
+	// API keys.
 	add_option( 'sbg_anthropic_api_key',   '' );
 	add_option( 'sbg_unsplash_access_key', '' );
+
+	// Generation settings.
+	add_option( 'sbg_anthropic_model',  SBG_ANTHROPIC_MODEL );
+	add_option( 'sbg_max_tokens',       4096 );
+	add_option( 'sbg_api_timeout',      90 );
+	add_option( 'sbg_word_count_min',   800 );
+	add_option( 'sbg_word_count_max',   1200 );
+	add_option( 'sbg_faq_count',        5 );
+	add_option( 'sbg_link_count',       3 );
+
+	// Content defaults.
+	add_option( 'sbg_default_tone',     'informational' );
+	add_option( 'sbg_default_category', 0 );
+	add_option( 'sbg_post_status',      'draft' );
+
+	// Image settings.
+	add_option( 'sbg_image_orientation', 'landscape' );
+	add_option( 'sbg_image_size',        'regular' );
 }

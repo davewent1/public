@@ -20,23 +20,49 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class SBG_API_Handler {
 
-	/** Anthropic API version header value. */
+	/** Anthropic API version header — this is an API protocol version, not the model. */
 	private const ANTHROPIC_VERSION = '2023-06-01';
-
-	/** Maximum tokens the model may use in its response. */
-	private const MAX_TOKENS = 4096;
-
-	/** HTTP timeout in seconds. Long generation can approach 30–45 s. */
-	private const HTTP_TIMEOUT = 90;
 
 	/** @var string The Anthropic API key. */
 	private string $api_key;
 
+	/** @var string Model ID read from wp_options at construction time. */
+	private string $model;
+
+	/** @var int Max tokens read from wp_options. */
+	private int $max_tokens;
+
+	/** @var int HTTP timeout in seconds read from wp_options. */
+	private int $http_timeout;
+
+	/** @var int Minimum target word count for the prompt. */
+	private int $word_count_min;
+
+	/** @var int Maximum target word count for the prompt. */
+	private int $word_count_max;
+
+	/** @var int Number of FAQ items to request. */
+	private int $faq_count;
+
+	/** @var int Number of internal-link placeholders to request. */
+	private int $link_count;
+
 	/**
+	 * Constructor — reads all generation options from wp_options so that
+	 * admin-configured values are always used without needing to pass them
+	 * through every method call.
+	 *
 	 * @param string $api_key Anthropic secret key from wp_options.
 	 */
 	public function __construct( string $api_key ) {
-		$this->api_key = $api_key;
+		$this->api_key        = $api_key;
+		$this->model          = (string) get_option( 'sbg_anthropic_model',  SBG_ANTHROPIC_MODEL );
+		$this->max_tokens     = (int)    get_option( 'sbg_max_tokens',       4096 );
+		$this->http_timeout   = (int)    get_option( 'sbg_api_timeout',      90 );
+		$this->word_count_min = (int)    get_option( 'sbg_word_count_min',   800 );
+		$this->word_count_max = (int)    get_option( 'sbg_word_count_max',   1200 );
+		$this->faq_count      = (int)    get_option( 'sbg_faq_count',        5 );
+		$this->link_count     = (int)    get_option( 'sbg_link_count',       3 );
 	}
 
 	// -------------------------------------------------------------------------
@@ -90,6 +116,12 @@ class SBG_API_Handler {
 	private function build_prompt( string $topic, string $keyword, string $tone ): string {
 		$tone_instruction = $this->tone_instruction( $tone );
 
+		// Interpolate admin-configured values into the prompt so the model
+		// always targets the word count, FAQ count, and link count set in Settings.
+		$word_range = "{$this->word_count_min}–{$this->word_count_max}";
+		$faq_count  = $this->faq_count;
+		$link_count = $this->link_count;
+
 		// The prompt uses a heredoc for readability. Indentation is intentional
 		// (no leading spaces in the API call — models are sensitive to whitespace).
 		return <<<PROMPT
@@ -115,24 +147,24 @@ You are a professional SEO content writer. Your ONLY output must be a single, va
 }
 
 ## content_html rules
-- 800–1200 words.
+- {$word_range} words.
 - Use semantic HTML only: <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>.
 - Do NOT include <html>, <head>, <body>, <script>, or <style> tags.
 - The very first <p> element MUST contain the exact phrase "{$keyword}".
 - The H1 is in a separate field — do NOT include an <h1> in content_html.
-- Include exactly 3 internal-link placeholders using this format: [LINK:anchor text here]. Use natural anchor text that describes a related article. List each anchor text in the internal_links array.
+- Include exactly {$link_count} internal-link placeholders using this format: [LINK:anchor text here]. Use natural anchor text that describes a related article. List each anchor text in the internal_links array.
 - Write in active voice. Vary sentence length. Aim for a Flesch reading ease above 60.
 - Include 4–6 <h2> sections. Close every opened tag properly.
 - End with a concise conclusion <h2> and closing paragraph.
 
 ## faq rules
-- Exactly 5 items.
+- Exactly {$faq_count} items.
 - Questions must be phrased conversationally (long-tail, as a real user would ask).
 - Answers must be factual, 1–3 sentences, and contain a natural variation of "{$keyword}".
 - Do NOT duplicate any question.
 
 ## internal_links rules
-- List all 3 anchors from content_html here with a suggested target_keyword.
+- List all {$link_count} anchors from content_html here with a suggested target_keyword.
 
 Return ONLY the raw JSON object. No other text whatsoever.
 PROMPT;
@@ -170,10 +202,10 @@ PROMPT;
 	 * @return array|WP_Error Decoded JSON response body or WP_Error.
 	 */
 	private function send_request( string $prompt ): array|WP_Error {
-		// Build the Messages API payload.
+		// Build the Messages API payload using admin-configured model and token budget.
 		$body = wp_json_encode( [
-			'model'      => SBG_ANTHROPIC_MODEL,
-			'max_tokens' => self::MAX_TOKENS,
+			'model'      => $this->model,
+			'max_tokens' => $this->max_tokens,
 			'messages'   => [
 				[
 					'role'    => 'user',
@@ -195,7 +227,7 @@ PROMPT;
 					'anthropic-version' => self::ANTHROPIC_VERSION,
 				],
 				'body'    => $body,
-				'timeout' => self::HTTP_TIMEOUT,
+				'timeout' => $this->http_timeout,
 			]
 		);
 

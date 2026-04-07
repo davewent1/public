@@ -22,26 +22,33 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class SBG_Image_Fetcher {
 
-	/** Number of results to request from Unsplash (we pick the first). */
+	/** Number of results to request from Unsplash (we always pick the first). */
 	private const SEARCH_PER_PAGE = 1;
 
-	/** Preferred image orientation. */
-	private const ORIENTATION = 'landscape';
-
-	/** HTTP timeout for the Unsplash search request. */
+	/** HTTP timeout for the Unsplash search request (not configurable — fast endpoint). */
 	private const SEARCH_TIMEOUT = 15;
 
-	/** HTTP timeout for the image download (larger file). */
+	/** HTTP timeout for the image download (larger file, not configurable). */
 	private const DOWNLOAD_TIMEOUT = 30;
 
 	/** @var string Unsplash Access Key. */
 	private string $access_key;
 
+	/** @var string Image orientation read from wp_options. */
+	private string $orientation;
+
+	/** @var string Unsplash URL size key read from wp_options. */
+	private string $image_size;
+
 	/**
+	 * Constructor — reads image options from wp_options.
+	 *
 	 * @param string $access_key Unsplash API access key from wp_options.
 	 */
 	public function __construct( string $access_key ) {
-		$this->access_key = $access_key;
+		$this->access_key  = $access_key;
+		$this->orientation = (string) get_option( 'sbg_image_orientation', 'landscape' );
+		$this->image_size  = (string) get_option( 'sbg_image_size',        'regular' );
 	}
 
 	// -------------------------------------------------------------------------
@@ -87,11 +94,12 @@ class SBG_Image_Fetcher {
 	 */
 	private function search( string $keyword ): array|WP_Error {
 		// Build the search URL with query parameters.
+		// Use admin-configured orientation from Settings → Image Settings.
 		$endpoint = add_query_arg(
 			[
 				'query'       => rawurlencode( $keyword ),
 				'per_page'    => self::SEARCH_PER_PAGE,
-				'orientation' => self::ORIENTATION,
+				'orientation' => $this->orientation,
 			],
 			SBG_UNSPLASH_ENDPOINT
 		);
@@ -149,9 +157,16 @@ class SBG_Image_Fetcher {
 
 		$photo = $body['results'][0];
 
-		// 'regular' size is ~1080 px wide — a good balance of quality and file size.
-		// Fall back to 'full' if 'regular' is absent (very unusual).
-		$url = $photo['urls']['regular'] ?? $photo['urls']['full'] ?? '';
+		// Use admin-configured image size (thumb/small/regular/full).
+		// Fall back through smaller sizes to ensure we always get a URL.
+		$size_fallbacks = [ $this->image_size, 'regular', 'small', 'full' ];
+		$url            = '';
+		foreach ( $size_fallbacks as $size ) {
+			if ( ! empty( $photo['urls'][ $size ] ) ) {
+				$url = $photo['urls'][ $size ];
+				break;
+			}
+		}
 
 		if ( empty( $url ) ) {
 			return new WP_Error( 'sbg_unsplash_no_url', __( 'Unsplash result contained no usable image URL.', 'smart-blog-generator' ) );

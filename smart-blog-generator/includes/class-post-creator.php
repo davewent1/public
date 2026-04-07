@@ -58,11 +58,18 @@ class SBG_Post_Creator {
 		$post_content = $this->build_post_content( $content );
 
 		// wp_insert_post() expects slashed data — wp_slash() handles that.
+		// Read post status from Settings → Content Defaults (draft or pending).
+		$post_status = (string) get_option( 'sbg_post_status', 'draft' );
+		$allowed_statuses = [ 'draft', 'pending' ];
+		if ( ! in_array( $post_status, $allowed_statuses, true ) ) {
+			$post_status = 'draft';
+		}
+
 		$postarr = [
 			'post_title'   => $content['h1'],
 			'post_content' => $post_content,
 			'post_excerpt' => $content['meta_description'],
-			'post_status'  => 'draft',
+			'post_status'  => $post_status,
 			'post_type'    => 'post',
 			'post_author'  => get_current_user_id(),
 		];

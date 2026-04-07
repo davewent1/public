@@ -41,6 +41,10 @@ class SBG_Generator_Page {
 		$anthropic_configured = ! empty( get_option( 'sbg_anthropic_api_key', '' ) );
 		$unsplash_configured  = ! empty( get_option( 'sbg_unsplash_access_key', '' ) );
 
+		// Read defaults from Settings so the form is pre-populated correctly.
+		$default_tone     = (string) get_option( 'sbg_default_tone',     'informational' );
+		$default_category = (int)    get_option( 'sbg_default_category', 0 );
+
 		$settings_url = admin_url( 'admin.php?page=smart-blog-generator-settings' );
 		?>
 		<div class="wrap sbg-wrap">
@@ -147,16 +151,26 @@ class SBG_Generator_Page {
 								</th>
 								<td>
 									<select id="sbg_tone" name="sbg_tone">
-										<option value="informational">
+										<option value="informational" <?php selected( $default_tone, 'informational' ); ?>>
 											<?php esc_html_e( 'Informational — neutral educational prose', 'smart-blog-generator' ); ?>
 										</option>
-										<option value="how-to">
+										<option value="how-to" <?php selected( $default_tone, 'how-to' ); ?>>
 											<?php esc_html_e( 'How-To — step-by-step instructions', 'smart-blog-generator' ); ?>
 										</option>
-										<option value="listicle">
+										<option value="listicle" <?php selected( $default_tone, 'listicle' ); ?>>
 											<?php esc_html_e( 'Listicle — list-based format (e.g. "10 ways…")', 'smart-blog-generator' ); ?>
 										</option>
 									</select>
+									<p class="description">
+										<?php
+										printf(
+											/* translators: 1: opening <a>, 2: closing </a> */
+											esc_html__( 'Default set in %1$sSettings%2$s.', 'smart-blog-generator' ),
+											'<a href="' . esc_url( $settings_url ) . '">',
+											'</a>'
+										);
+										?>
+									</p>
 								</td>
 							</tr>
 
@@ -172,9 +186,11 @@ class SBG_Generator_Page {
 									// Use WordPress's built-in category dropdown helper.
 									// show_option_none lets the user pick "no override"
 									// (will fall back to Uncategorized in the post creator).
+									// Pre-select the category saved in Settings → Content Defaults.
 									wp_dropdown_categories( [
 										'name'              => 'sbg_category',
 										'id'                => 'sbg_category',
+										'selected'          => $default_category,
 										'show_option_none'  => __( '— Default (Uncategorized) —', 'smart-blog-generator' ),
 										'option_none_value' => '0',
 										'hide_empty'        => false,
