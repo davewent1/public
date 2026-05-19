@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model DailyLog {
+  id             Int      @id @default(autoincrement())
+  date           DateTime @unique
+  sleepScore     Float?
+  sleepHours     Float?
+  sleepDeep      Float?
+  sleepRem       Float?
+  sleepLight     Float?
+  hrv            Float?
+  restingHR      Float?
+  steps          Int?
+  stressScore    Float?
+  activeCalories Int?
+  caloriesIn     Int?
+  proteinG       Float?
+  carbsG         Float?
+  fatG           Float?
+  weight         Float?
+  mood           Int?
+  energy         Int?
+  fastingHours   Float?
+  notes          String?
+  vo2Max         Float?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Goal {
+  id        Int       @id @default(autoincrement())
+  name      String
+  metric    String
+  target    Float
+  current   Float     @default(0)
+  unit      String
+  deadline  DateTime?
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+}
+
+model SyncLog {
+  id       Int      @id @default(autoincrement())
+  source   String
+  status   String
+  message  String?
+  syncedAt DateTime @default(now())
+}
+
+model WeeklyReview {
+  id        Int      @id @default(autoincrement())
+  weekStart DateTime @unique
+  content   String
+  rawData   String
+  createdAt DateTime @default(now())
+}
